@@ -4,6 +4,8 @@ package {{packageName}};
 
 import io.reactivex.Observable;
 import io.reactivex.Single;
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.reactivex.core.Vertx;
 import io.vertx.reactivex.core.net.SocketAddress;
 import io.vertx.reactivex.grpc.client.GrpcClient;
@@ -12,6 +14,7 @@ import {{.}};
 {{/imports}}
 
 public class {{className}} {
+    private static final Logger logger = LoggerFactory.getLogger({{className}}.class.getName());
     private final GrpcClient client;
     private final SocketAddress socketAddress;
 
@@ -25,10 +28,16 @@ public class {{className}} {
     public Single<{{outputType}}> {{methodName}}({{inputType}} request) {
         return Single.create(emitter ->
                 client.request(socketAddress, {{serviceName}}Grpc.{{methodNameGetter}}()).compose(req -> {
-                            req.end({{inputType}}.toProto(request));
+                            logger.debug("Sending update request: " + req);
+                            var r = {{inputType}}.toProto(request);
+                            logger.debug("Object: " + r);
+                            req.end(r);
                             return req.response().compose(resp -> resp.last());
                         })
-                        .onFailure(error -> emitter.onError(error))
+                        .onFailure(error -> {
+                            logger.warn("Error while sending {{methodNameGetter}} request", error);
+                            emitter.onError(error);
+                        })
                         .onSuccess(resp -> emitter.onSuccess({{outputType}}.fromProto(resp))));
     }
 

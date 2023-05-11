@@ -4,6 +4,8 @@ package {{packageName}};
 
 import io.reactivex.Observable;
 import io.reactivex.Single;
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.Handler;
 import io.vertx.reactivex.core.Vertx;
 import io.vertx.reactivex.core.http.HttpServerRequest;
@@ -13,6 +15,7 @@ import {{.}};
 {{/imports}}
 
 public class {{className}}  {
+    private static final Logger logger = LoggerFactory.getLogger({{className}}.class);
     private final GrpcServer server;
 
     public {{className}}(Vertx vertx) {
@@ -37,10 +40,18 @@ public class {{className}}  {
 
     public {{className}} callHandlers({{serviceName}}Api implementation) {
 {{#unaryMethods}}
+        logger.debug("Register handlers for {{serviceName}}");
         server.callHandler({{serviceName}}Grpc.{{methodNameGetter}}(), request -> {
-            request.handler(req -> implementation.{{methodName}}({{inputType}}.fromProto(req))
+            logger.debug("Received {{methodNameGetter}} request.");
+            request.handler(req -> {
+                logger.debug("Handling req for {{methodNameGetter}} with req: " + req);
+                var r = {{inputType}}.fromProto(req);
+                logger.debug("Object: " + r);
+                implementation.{{methodName}}(r)
                     .doOnSuccess(resp -> request.response().end({{outputType}}.toProto(resp)))
-                    .subscribe());
+                    .doOnError(throwable -> logger.warn("Error while handling {{methodNameGetter}}", throwable))
+                    .subscribe();
+            });
         });
 {{/unaryMethods}}
 {{#unaryManyMethods}}
